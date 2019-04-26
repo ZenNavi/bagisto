@@ -118,7 +118,7 @@ class ProductFlat
     public function afterAttributeDeleted($attributeId)
     {
         $attribute = $this->attributeRepository->find($attributeId);
-        
+
         if (Schema::hasColumn('product_flat', strtolower($attribute->code))) {
             Schema::table('product_flat', function (Blueprint $table) use($attribute) {
                 $table->dropColumn($attribute->code);
@@ -180,13 +180,13 @@ class ProductFlat
                 foreach ($familyAttributes[$product->attribute_family->id] as $attribute) {
                     if ($parentProduct && ! in_array($attribute->code, ['sku', 'name', 'price', 'weight', 'status']))
                         continue;
-                    
+
                     if (in_array($attribute->code, ['short_description', 'tax_category_id', 'meta_title', 'meta_keywords', 'meta_description', 'width', 'height']))
                         continue;
 
-                    // if (! Schema::hasColumn('product_flat', $attribute->code))
-                    //     continue;
-                    
+                    if (! Schema::hasColumn('product_flat', $attribute->code))
+                        continue;
+
                     if ($attribute->value_per_channel) {
                         if ($attribute->value_per_locale) {
                             $productAttributeValue = $product->attribute_values()->where('channel', $channel->code)->where('locale', $locale->code)->where('attribute_id', $attribute->id)->first();
@@ -216,6 +216,24 @@ class ProductFlat
                             } else {
                                 $productFlat->{$attribute->code . '_label'} = $attributeOption->admin_name;
                             }
+                        }
+                    } elseif ($attribute->type == 'multiselect') {
+                        $attributeOptionIds = explode(',', $product->{$attribute->code});
+
+                        if (count($attributeOptionIds)) {
+                            $attributeOptions = $this->attributeOptionRepository->findWhereIn('id', $attributeOptionIds);
+
+                            $optionLabels = [];
+
+                            foreach ($attributeOptions as $attributeOption) {
+                                if ($attributeOptionTranslation = $attributeOption->translate($locale->code)) {
+                                    $optionLabels[] = $attributeOptionTranslation->label;
+                                } else {
+                                    $optionLabels[] = $attributeOption->admin_name;
+                                }
+                            }
+
+                            $productFlat->{$attribute->code . '_label'} = implode(', ', $optionLabels);
                         }
                     }
                 }
